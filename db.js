@@ -2,16 +2,16 @@ import pg from 'pg';
 import { Pool } from 'pg';
 
 let localPoolConfig = {
-    user: 'postgres',
-    password: '12345',
-    // Fixed logic: use localhost as default since your Docker exposes port 5432
-    host: process.env.DB_HOST || "localhost",
-    port: '5432',
-    database: 'jwttut',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '12345',
+    host: process.env.DB_HOST || 'localhost', // 'db' inside docker-compose
+    port: process.env.DB_PORT || '5432',
+    database: process.env.DB_NAME || 'jwttut',
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 30000,
     max: 20
 };
+
 
 const poolConfig = process.env.DATABASE_URL ? { 
     connectionString: process.env.DATABASE_URL, 

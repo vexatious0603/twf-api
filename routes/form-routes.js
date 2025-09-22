@@ -32,9 +32,9 @@ router.post("/submitForm", upload.single("pdfFile"), async (req, res) => {
 
       const formData = await pool.query(
         `INSERT INTO user_forms
-        (user_name, user_mobile, user_email, user_age, user_address, user_aadhar,
-          user_monthly_income, user_electricity_bill, received_assistance, residence_type,
-          assistance_type, referred_by, pdf_path)
+          (user_name, user_mobile, user_email, user_age, user_address, user_aadhar,
+            user_monthly_income, user_electricity_bill, received_assistance, residence_type,
+            assistance_type, referred_by, pdf_path)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) 
         RETURNING *`,
         [
