@@ -47,10 +47,10 @@ app.use((req, res, next) => {
 });
 
 
-app.use('/api/users',userRouter);
-app.use('/api/auth',authRouter);
+// apply json only to routes that expect JSON
+app.use('/api/users', json(), userRouter);
+app.use('/api/auth', json(), authRouter);
 app.use('/api/form',formRoute);
-app.use('/uploads', express.static('uploads'));
 app.use('/',express.static(join(__dirname,'public')));
 
 

@@ -1,55 +1,84 @@
+// form-routes.js
 import express from "express";
 import pool from "../db.js";
-import transporter from "../utils/emailConfig.js";
 
-import Joi from "joi";
-import validator from "../utils/validator.js";
-import multer from "multer";
 import { authenticateToken } from "../middleware/authorization.js";
 import { successResponse, errorResponse } from "../utils/response.js"; // ✅ reuse helpers
 
+import multer from "multer";
+import { s3 } from "../utils/s3.js";
+
+
+const myBucket = process.env.AWS_BUCKET_NAME
+
+
+const upload = multer({
+  storage:multer.memoryStorage(),
+  limits:{fileSize : 5* 1024 * 1024},
+});
+
+
+
+
+
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+
+router.post("/test-upload", upload.single("file"), (req, res) => {
+  console.log(req.file);
+  res.json(req.file);
 });
-const upload = multer({ storage });
 
 // 📌 Submit form
-router.post("/submitForm", upload.single("pdfFile"), async (req, res) => {
-    try {
-      const { error, value } = validator(req.body);
-      if (error) return errorResponse(res, error, 400);
+router.post("/submitForm", upload.single("file"), async (req, res) => {
+  try {
+    console.log("FILE DEBUG:", req.file);
 
-      const {
+     // Check if file exists
+    if (!req.file) {
+      return errorResponse(res, "No file uploaded. Please select a file.", 400);
+    }
+
+    const {
+      userName, userMobile, userEmail, userAge, userAddress,
+      userAadhar, userMonthlyIncome, userElectricityBill,
+      receivedAssistance, residenceType, assistanceType, referredBy,
+    } = req.body;
+
+    // upload to S3 using promise
+    const params = {
+      Bucket: "twf-documents-bucket",
+      Key: Date.now() + "-" + req.file.originalname,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+    };
+
+    const data = await s3.upload(params).promise(); // ✅ no callback
+    const pdfUrl = data.Location; // correct key
+
+    // insert into db
+    const formData = await pool.query(
+      `INSERT INTO user_forms
+        (user_name, user_mobile, user_email, user_age, user_address, user_aadhar,
+         user_monthly_income, user_electricity_bill, received_assistance, residence_type,
+         assistance_type, referred_by, pdf_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) 
+       RETURNING *`,
+      [
         userName, userMobile, userEmail, userAge, userAddress,
         userAadhar, userMonthlyIncome, userElectricityBill,
         receivedAssistance, residenceType, assistanceType, referredBy,
-      } = value;
+        pdfUrl,
+      ]
+    );
 
-      const pdfPath = req.file ? req.file.path : null;
-
-      const formData = await pool.query(
-        `INSERT INTO user_forms
-          (user_name, user_mobile, user_email, user_age, user_address, user_aadhar,
-            user_monthly_income, user_electricity_bill, received_assistance, residence_type,
-            assistance_type, referred_by, pdf_path)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) 
-        RETURNING *`,
-        [
-          userName, userMobile, userEmail, userAge, userAddress,
-          userAadhar, userMonthlyIncome, userElectricityBill,
-          receivedAssistance, residenceType, assistanceType, referredBy,
-          pdfPath,
-        ]
-      );
-
-      return successResponse(res, "Form submitted successfully", formData.rows[0]);
-    } catch (err) {
-      return errorResponse(res, err.message);
-    }
+    return successResponse(res, "Form submitted successfully", formData.rows[0]);
+  } catch (err) {
+    console.error("Error:", err);
+    return errorResponse(res, err.message);
+  }
 });
+
 
 // 📌 Get all forms
 router.get("/", authenticateToken, async (req, res) => {
